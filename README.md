@@ -3,7 +3,8 @@
 
 Современная, стильная и адаптивная реализация классической настольной игры **«Четыре в ряд»** (Connect 4), написанная на чистых HTML5, CSS3 (Tailwind CSS) и JavaScript. В игре реализован умный искусственный интеллект с 4 уровнями сложности, звуковые эффекты через Web Audio API и анимация гравитационного падения фишек.
 
-![Скриншот игры](https://via.placeholder.com/800x450.png?text=Connect+4+Game+Preview) *(Добавьте сюда скриншот вашего проекта)*
+<img width="1115" height="877" alt="image" src="https://github.com/user-attachments/assets/6fddddb0-b24c-438f-bc7e-d464f61afe0c" />
+
 
 ---
 
