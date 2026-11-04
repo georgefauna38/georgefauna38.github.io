@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Четыре в ряд — Игра с ИИ</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Marcellus & Nunito -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: linear-gradient(135deg, #1f1b24 0%, #2b2333 50%, #18151e 100%);
+            color: #f3e8ee;
+            min-height: 100vh;
+        }
+
+        .font-header {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* 3D Board Frame Effects */
+        .board-frame {
+            background: linear-gradient(145deg, #2a4175, #192a52);
+            box-shadow: 
+                0 20px 40px rgba(0, 0, 0, 0.6),
+                inset 0 2px 4px rgba(255, 255, 255, 0.2),
+                inset 0 -4px 10px rgba(0, 0, 0, 0.5);
+            border: 8px solid #142242;
+        }
+
+        .board-slot {
+            box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.8), inset 0 -1px 2px rgba(255, 255, 255, 0.1);
+            background-color: #0f1a34;
+        }
+
+        /* Discs styles */
+        .disc {
+            transition: transform 0.15s ease;
+            position: relative;
+        }
+
+        .disc-red {
+            background: radial-gradient(circle at 35% 35%, #ff6b6b 0%, #ee5253 60%, #c0392b 100%);
+            box-shadow: inset 0 2px 5px rgba(255, 255, 255, 0.4), inset 0 -3px 5px rgba(0, 0, 0, 0.4), 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .disc-yellow {
+            background: radial-gradient(circle at 35% 35%, #feca57 0%, #ff9f43 60%, #e67e22 100%);
+            box-shadow: inset 0 2px 5px rgba(255, 255, 255, 0.5), inset 0 -3px 5px rgba(0, 0, 0, 0.4), 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Winning glowing effect */
+        .winner-disc {
+            animation: pulse-glow 1.2s infinite alternate ease-in-out;
+            z-index: 10;
+        }
+
+        @keyframes pulse-glow {
+            0% {
+                transform: scale(0.92);
+                box-shadow: 0 0 10px #fff, inset 0 2px 5px rgba(255, 255, 255, 0.6);
+            }
+            100% {
+                transform: scale(1.06);
+                box-shadow: 0 0 25px #fff, 0 0 15px currentColor, inset 0 2px 5px rgba(255, 255, 255, 0.8);
+            }
+        }
+
+        /* Drop Animation dynamic keyframes via JS or smooth CSS */
+        .falling {
+            animation-timing-function: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+        }
+
+        /* Glassmorphism containers */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-button {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            transition: all 0.2s ease;
+        }
+        .glass-button:hover {
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        .glass-button:active {
+            transform: translateY(0);
+        }
+
+        /* Active column highlight */
+        .column-hover-highlight {
+            background-color: rgba(255, 255, 255, 0.04);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen justify-between items-center p-3 md:p-6 select-none">
+
+    <!-- Header & Stats -->
+    <header class="w-full max-w-4xl flex flex-col md:flex-row justify-between items-center gap-4 mb-4">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-2xl disc-red flex items-center justify-center text-white text-xl font-bold shadow-lg">
+                <i class="fa-solid fa-layer-group"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold font-header tracking-wide bg-gradient-to-r from-red-400 via-amber-300 to-yellow-400 bg-clip-text text-transparent">
+                    Четыре в ряд
+                </h1>
+                <p class="text-xs text-gray-400">Уютная логическая настольная игра</p>
+            </div>
+        </div>
+
+        <!-- Score Board -->
+        <div class="glass-panel px-6 py-2.5 rounded-2xl flex items-center gap-6 text-sm md:text-base font-semibold shadow-inner">
+            <div class="flex items-center gap-2">
+                <span class="w-4 h-4 rounded-full disc-red inline-block"></span>
+                <span>Вы: <span id="score-player" class="text-xl font-bold text-red-400 ml-1">0</span></span>
+            </div>
+            <div class="h-6 w-px bg-gray-600/50"></div>
+            <div class="flex items-center gap-2">
+                <span>Ничьи: <span id="score-draws" class="text-xl font-bold text-gray-400 ml-1">0</span></span>
+            </div>
+            <div class="h-6 w-px bg-gray-600/50"></div>
+            <div class="flex items-center gap-2">
+                <span class="w-4 h-4 rounded-full disc-yellow inline-block"></span>
+                <span>Бот: <span id="score-ai" class="text-xl font-bold text-amber-400 ml-1">0</span></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="w-full max-w-4xl flex flex-col items-center gap-6">
+
+        <!-- Controls / Status Bar -->
+        <div class="w-full flex flex-col sm:flex-row justify-between items-center gap-4 glass-panel p-3 md:px-6 rounded-2xl">
+            <!-- Difficulty Selector -->
+            <div class="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-center flex-wrap">
+                <span class="text-xs text-gray-400 font-semibold uppercase tracking-wider mr-1">Сложность:</span>
+                <button onclick="setDifficulty('easy')" id="btn-easy" class="diff-btn glass-button px-2.5 py-1.5 rounded-xl text-xs font-bold transition">Легко</button>
+                <button onclick="setDifficulty('medium')" id="btn-medium" class="diff-btn glass-button px-2.5 py-1.5 rounded-xl text-xs font-bold transition">Средне</button>
+                <button onclick="setDifficulty('hard')" id="btn-hard" class="diff-btn glass-button px-2.5 py-1.5 rounded-xl text-xs font-bold transition">Сложно</button>
+                <button onclick="setDifficulty('master')" id="btn-master" class="diff-btn glass-button px-2.5 py-1.5 rounded-xl text-xs font-bold transition">🔥 Мастер</button>
+            </div>
+
+            <!-- Status Indicator -->
+            <div id="status-text" class="text-base font-bold text-center px-4 py-1 rounded-xl bg-white/5 border border-white/10 text-amber-200 min-w-[200px]">
+                Ваш ход (Красные)
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-2">
+                <button onclick="toggleSound()" id="sound-btn" class="glass-button p-2.5 rounded-xl text-gray-300 hover:text-white" title="Включить/выключить звук">
+                    <i class="fa-solid fa-volume-high text-sm"></i>
+                </button>
+                <button onclick="resetGame()" class="glass-button px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 text-amber-300 hover:text-amber-200">
+                    <i class="fa-solid fa-rotate-right"></i> Новая игра
+                </button>
+            </div>
+        </div>
+
+        <!-- Interactive Game Board Container -->
+        <div class="relative flex flex-col items-center">
+            
+            <!-- Column Indicator / Arrow Preview Header -->
+            <div id="column-indicators" class="grid grid-cols-7 gap-2 md:gap-3.5 w-full max-w-[340px] sm:max-w-[480px] md:max-w-[560px] px-3 mb-1 h-6">
+                <!-- Dynamically generated hover indicators -->
+            </div>
+
+            <!-- The Grid Frame -->
+            <div id="board-container" class="board-frame p-3 md:p-4 rounded-3xl relative overflow-hidden">
+                <!-- Animation Layer for Falling Discs -->
+                <div id="animation-layer" class="absolute inset-0 pointer-events-none p-3 md:p-4 z-20"></div>
+
+                <!-- Main Slots Grid -->
+                <div id="board-grid" class="grid grid-cols-7 gap-2 sm:gap-3 md:gap-3.5 max-w-[340px] sm:max-w-[480px] md:max-w-[560px]">
+                    <!-- 42 slots generated by JS -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer info -->
+    <footer class="mt-6 text-center text-xs text-gray-500">
+        Соберите 4 фишки одного цвета по горизонтали, вертикали или диагонали.
+    </footer>
+
+    <!-- Game Logic Script -->
+    <script>
+        // Constants & Config
+        const ROWS = 6;
+        const COLS = 7;
+        const PLAYER = 1; // Red
+        const AI = 2;     // Yellow
+        const EMPTY = 0;
+
+        // Transposition Table & Zobrist Hashing for Master AI
+        const tt = new Map();
+        let zobristTable = [];
+
+        function initZobrist() {
+            zobristTable = [];
+            for (let r = 0; r < ROWS; r++) {
+                zobristTable[r] = [];
+                for (let c = 0; c < COLS; c++) {
+                    zobristTable[r][c] = [
+                        0, // empty
+                        Math.floor(Math.random() * 2147483647), // PLAYER
+                        Math.floor(Math.random() * 2147483647)  // AI
+                    ];
+                }
+            }
+        }
+        initZobrist();
+
+        function computeHash(b) {
+            let hash = 0;
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const piece = b[r][c];
+                    if (piece !== EMPTY) {
+                        hash ^= zobristTable[r][c][piece];
+                    }
+                }
+            }
+            return hash;
+        }
+
+        // Sound System (Web Audio API)
+        let soundEnabled = true;
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            try {
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'drop') {
+                    // Soft wood/plastic drop sound
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(320, now);
+                    osc.frequency.exponentialRampToValueAtTime(80, now + 0.12);
+                    gain.gain.setValueAtTime(0.4, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                    osc.start(now);
+                    osc.stop(now + 0.12);
+                } else if (type === 'win') {
+                    // Win fanfare chime
+                    const notes = [440, 554.37, 659.25, 880];
+                    notes.forEach((freq, idx) => {
+                        const noteOsc = audioCtx.createOscillator();
+                        const noteGain = audioCtx.createGain();
+                        noteOsc.connect(noteGain);
+                        noteGain.connect(audioCtx.destination);
+                        
+                        noteOsc.type = 'triangle';
+                        noteOsc.frequency.setValueAtTime(freq, now + idx * 0.09);
+                        noteGain.gain.setValueAtTime(0.2, now + idx * 0.09);
+                        noteGain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.3);
+                        
+                        noteOsc.start(now + idx * 0.09);
+                        noteOsc.stop(now + idx * 0.09 + 0.3);
+                    });
+                } else if (type === 'draw') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(200, now);
+                    osc.frequency.linearRampToValueAtTime(150, now + 0.25);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                }
+            } catch (e) {
+                console.log('Audio playback error:', e);
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('sound-btn');
+            if (soundEnabled) {
+                btn.innerHTML = '<i class="fa-solid fa-volume-high text-sm"></i>';
+                btn.classList.remove('text-gray-500');
+                btn.classList.add('text-gray-300');
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-volume-xmark text-sm"></i>';
+                btn.classList.remove('text-gray-300');
+                btn.classList.add('text-gray-500');
+            }
+        }
+
+        // Game State Variables
+        let board = [];
+        let currentPlayer = PLAYER;
+        let isGameOver = false;
+        let isAnimating = false;
+        let difficulty = 'medium'; // 'easy', 'medium', 'hard', 'master'
+        let scores = { player: 0, ai: 0, draws: 0 };
+
+        // DOM elements
+        const boardGrid = document.getElementById('board-grid');
+        const columnIndicators = document.getElementById('column-indicators');
+        const animationLayer = document.getElementById('animation-layer');
+        const statusText = document.getElementById('status-text');
+
+        // Initialize Board UI & Logic
+        function initBoard() {
+            board = Array(ROWS).fill(null).map(() => Array(COLS).fill(EMPTY));
+            boardGrid.innerHTML = '';
+            columnIndicators.innerHTML = '';
+
+            // Generate Column Indicators (Top hover arrows)
+            for (let c = 0; c < COLS; c++) {
+                const ind = document.createElement('div');
+                ind.id = `indicator-${c}`;
+                ind.className = 'flex justify-center items-center opacity-0 transition-opacity duration-150';
+                ind.innerHTML = '<i class="fa-solid fa-chevron-down text-red-400 text-sm animate-bounce"></i>';
+                columnIndicators.appendChild(ind);
+            }
+
+            // Generate 42 Slots
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const slot = document.createElement('div');
+                    slot.id = `slot-${r}-${c}`;
+                    slot.className = 'board-slot w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 relative';
+                    
+                    // Column mouse hover listeners
+                    slot.addEventListener('mouseenter', () => highlightColumn(c, true));
+                    slot.addEventListener('mouseleave', () => highlightColumn(c, false));
+                    slot.addEventListener('click', () => handleHumanMove(c));
+
+                    boardGrid.appendChild(slot);
+                }
+            }
+
+            updateDifficultyUI();
+        }
+
+        // Column Hover FX
+        function highlightColumn(col, isHovered) {
+            if (isGameOver || isAnimating || currentPlayer !== PLAYER) return;
+            const ind = document.getElementById(`indicator-${col}`);
+            if (ind) {
+                ind.style.opacity = isHovered ? '1' : '0';
+            }
+            for (let r = 0; r < ROWS; r++) {
+                const slot = document.getElementById(`slot-${r}-${col}`);
+                if (slot) {
+                    if (isHovered) {
+                        slot.classList.add('column-hover-highlight');
+                    } else {
+                        slot.classList.remove('column-hover-highlight');
+                    }
+                }
+            }
+        }
+
+        // Difficulty Selection
+        function setDifficulty(level) {
+            if (isAnimating) return;
+            difficulty = level;
+            updateDifficultyUI();
+            resetGame();
+        }
+
+        function updateDifficultyUI() {
+            ['easy', 'medium', 'hard', 'master'].forEach(lvl => {
+                const btn = document.getElementById(`btn-${lvl}`);
+                if (lvl === difficulty) {
+                    if (lvl === 'master') {
+                        btn.className = 'diff-btn px-2.5 py-1.5 rounded-xl text-xs font-bold transition bg-red-600/30 text-red-300 border border-red-500/50 shadow-sm animate-pulse';
+                    } else {
+                        btn.className = 'diff-btn px-2.5 py-1.5 rounded-xl text-xs font-bold transition bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm';
+                    }
+                } else {
+                    btn.className = 'diff-btn glass-button px-2.5 py-1.5 rounded-xl text-xs font-bold transition text-gray-400 hover:text-white';
+                }
+            });
+        }
+
+        // Reset Game
+        function resetGame() {
+            board = Array(ROWS).fill(null).map(() => Array(COLS).fill(EMPTY));
+            tt.clear();
+            isGameOver = false;
+            isAnimating = false;
+            currentPlayer = PLAYER;
+
+            // Clear visual slots
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const slot = document.getElementById(`slot-${r}-${c}`);
+                    slot.innerHTML = '';
+                    slot.className = 'board-slot w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 relative';
+                }
+            }
+
+            statusText.innerHTML = 'Ваш ход (Красные)';
+            statusText.className = 'text-base font-bold text-center px-4 py-1 rounded-xl bg-white/5 border border-white/10 text-amber-200 min-w-[200px]';
+        }
+
+        // Handle Player Click
+        function handleHumanMove(col) {
+            if (isGameOver || isAnimating || currentPlayer !== PLAYER) return;
+
+            const row = getNextOpenRow(board, col);
+            if (row !== -1) {
+                highlightColumn(col, false);
+                makeMove(row, col, PLAYER);
+            }
+        }
+
+        // Make Move with Smooth Drop Animation
+        function makeMove(row, col, player) {
+            isAnimating = true;
+
+            const targetSlot = document.getElementById(`slot-${row}-${col}`);
+            const boardRect = boardGrid.getBoundingClientRect();
+            const slotRect = targetSlot.getBoundingClientRect();
+
+            // Create temporary falling disc element
+            const animDisc = document.createElement('div');
+            const colorClass = player === PLAYER ? 'disc-red' : 'disc-yellow';
+            animDisc.className = `disc ${colorClass} rounded-full absolute z-30`;
+            
+            // Set size equal to target slot
+            const width = slotRect.width;
+            const height = slotRect.height;
+            animDisc.style.width = `${width}px`;
+            animDisc.style.height = `${height}px`;
+
+            // Calculate start and end offsets relative to board container
+            const leftOffset = slotRect.left - boardRect.left;
+            const startTop = -height - 20; // Starts just above board
+            const endTop = slotRect.top - boardRect.top;
+
+            animDisc.style.left = `${leftOffset}px`;
+            animDisc.style.top = `${startTop}px`;
+
+            animationLayer.appendChild(animDisc);
+
+            // Animate Drop using requestAnimationFrame / CSS Transitions
+            const duration = 250 + row * 40; // Deeper drop takes slightly longer
+            const startTime = performance.now();
+
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Ease In Bounce effect logic for natural drop
+                const easeIn = progress * progress; 
+                const currentTop = startTop + (endTop - startTop) * easeIn;
+
+                animDisc.style.top = `${currentTop}px`;
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    // Animation complete
+                    animationLayer.removeChild(animDisc);
+                    
+                    // Place disc inside slot
+                    board[row][col] = player;
+                    const discElem = document.createElement('div');
+                    discElem.className = `disc ${colorClass} w-full h-full rounded-full`;
+                    targetSlot.appendChild(discElem);
+
+                    playSound('drop');
+                    isAnimating = false;
+
+                    // Check Game Over or Switch Player
+                    if (checkWin(board, player)) {
+                        handleEndGame(player);
+                    } else if (isBoardFull(board)) {
+                        handleEndGame(0); // Draw
+                    } else {
+                        currentPlayer = (player === PLAYER) ? AI : PLAYER;
+                        updateStatusUI();
+
+                        if (currentPlayer === AI && !isGameOver) {
+                            setTimeout(triggerAIMove, 450);
+                        }
+                    }
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function updateStatusUI() {
+            if (currentPlayer === PLAYER) {
+                statusText.innerHTML = 'Ваш ход (Красные)';
+                statusText.className = 'text-base font-bold text-center px-4 py-1 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 min-w-[200px] animate-pulse';
+            } else {
+                statusText.innerHTML = '<i class="fa-solid fa-robot mr-2"></i>Бот думает...';
+                statusText.className = 'text-base font-bold text-center px-4 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 min-w-[200px]';
+            }
+        }
+
+        // Handle Victory / Draw
+        function handleEndGame(winner) {
+            isGameOver = true;
+            if (winner === PLAYER) {
+                scores.player++;
+                document.getElementById('score-player').innerText = scores.player;
+                statusText.innerHTML = '🎉 Вы победитель!';
+                statusText.className = 'text-base font-bold text-center px-4 py-1 rounded-xl bg-green-500/20 border border-green-500/40 text-green-300 min-w-[200px]';
+                playSound('win');
+            } else if (winner === AI) {
+                scores.ai++;
+                document.getElementById('score-ai').innerText = scores.ai;
+                statusText.innerHTML = '🤖 Бот одержал победу!';
+                statusText.className = 'text-base font-bold text-center px-4 py-1 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 min-w-[200px]';
+                playSound('win');
+            } else {
+                scores.draws++;
+                document.getElementById('score-draws').innerText = scores.draws;
+                statusText.innerHTML = '🤝 Ничья!';
+                statusText.className = 'text-base font-bold text-center px-4 py-1 rounded-xl bg-gray-500/20 border border-gray-500/40 text-gray-300 min-w-[200px]';
+                playSound('draw');
+            }
+
+            // Highlight Winning Line Discs
+            if (winner !== 0) {
+                const winningCells = getWinningCells(board, winner);
+                winningCells.forEach(([r, c]) => {
+                    const slot = document.getElementById(`slot-${r}-${c}`);
+                    if (slot && slot.firstChild) {
+                        slot.firstChild.classList.add('winner-disc');
+                    }
+                });
+            }
+        }
+
+        // Board Check Helpers
+        function getNextOpenRow(b, col) {
+            for (let r = ROWS - 1; r >= 0; r--) {
+                if (b[r][col] === EMPTY) return r;
+            }
+            return -1;
+        }
+
+        function getValidLocations(b) {
+            const valid = [];
+            for (let c = 0; c < COLS; c++) {
+                if (b[0][c] === EMPTY) valid.push(c);
+            }
+            return valid;
+        }
+
+        function isBoardFull(b) {
+            return getValidLocations(b).length === 0;
+        }
+
+        function checkWin(b, p) {
+            // Horizontal check
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    if (b[r][c] === p && b[r][c+1] === p && b[r][c+2] === p && b[r][c+3] === p) return true;
+                }
+            }
+            // Vertical check
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (b[r][c] === p && b[r+1][c] === p && b[r+2][c] === p && b[r+3][c] === p) return true;
+                }
+            }
+            // Positive diagonal check
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    if (b[r][c] === p && b[r+1][c+1] === p && b[r+2][c+2] === p && b[r+3][c+3] === p) return true;
+                }
+            }
+            // Negative diagonal check
+            for (let r = 3; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    if (b[r][c] === p && b[r-1][c+1] === p && b[r-2][c+2] === p && b[r-3][c+3] === p) return true;
+                }
+            }
+            return false;
+        }
+
+        function getWinningCells(b, p) {
+            const cells = [];
+            // Horizontal
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    if (b[r][c] === p && b[r][c+1] === p && b[r][c+2] === p && b[r][c+3] === p) {
+                        return [[r,c], [r,c+1], [r,c+2], [r,c+3]];
+                    }
+                }
+            }
+            // Vertical
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (b[r][c] === p && b[r+1][c] === p && b[r+2][c] === p && b[r+3][c] === p) {
+                        return [[r,c], [r+1,c], [r+2,c], [r+3,c]];
+                    }
+                }
+            }
+            // Positive diagonal
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    if (b[r][c] === p && b[r+1][c+1] === p && b[r+2][c+2] === p && b[r+3][c+3] === p) {
+                        return [[r,c], [r+1,c+1], [r+2,c+2], [r+3,c+3]];
+                    }
+                }
+            }
+            // Negative diagonal
+            for (let r = 3; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    if (b[r][c] === p && b[r-1][c+1] === p && b[r-2][c+2] === p && b[r-3][c+3] === p) {
+                        return [[r,c], [r-1,c+1], [r-2,c+2], [r-3,c+3]];
+                    }
+                }
+            }
+            return cells;
+        }
+
+        // AI Logic Implementation (Easy, Medium, Hard, Master)
+        function triggerAIMove() {
+            if (isGameOver) return;
+
+            const validCols = getValidLocations(board);
+            if (validCols.length === 0) return;
+
+            let chosenCol = validCols[0];
+
+            if (difficulty === 'easy') {
+                // Completely Random choice
+                chosenCol = validCols[Math.floor(Math.random() * validCols.length)];
+            } else if (difficulty === 'medium') {
+                // Rule-based heuristic
+                chosenCol = getMediumAIMove(validCols);
+            } else if (difficulty === 'hard') {
+                // Minimax with Alpha-Beta Pruning (Depth 5)
+                const [bestCol, _] = minimax(board, 5, -Infinity, Infinity, true);
+                chosenCol = (bestCol !== null && bestCol !== undefined) ? bestCol : validCols[Math.floor(Math.random() * validCols.length)];
+            } else if (difficulty === 'master') {
+                // Ultra-Fast Grandmaster AI (Depth 8 + Transposition Table + Move Ordering)
+                tt.clear();
+                const [bestCol, _] = minimaxMaster(board, 8, -Infinity, Infinity, true);
+                chosenCol = (bestCol !== null && bestCol !== undefined) ? bestCol : getMediumAIMove(validCols);
+            }
+
+            const row = getNextOpenRow(board, chosenCol);
+            if (row !== -1) {
+                makeMove(row, chosenCol, AI);
+            }
+        }
+
+        // Medium AI logic
+        function getMediumAIMove(validCols) {
+            // 1. Can AI win immediately?
+            for (let col of validCols) {
+                const r = getNextOpenRow(board, col);
+                const boardCopy = board.map(row => [...row]);
+                boardCopy[r][col] = AI;
+                if (checkWin(boardCopy, AI)) return col;
+            }
+            // 2. Can Player win next turn? Block them!
+            for (let col of validCols) {
+                const r = getNextOpenRow(board, col);
+                const boardCopy = board.map(row => [...row]);
+                boardCopy[r][col] = PLAYER;
+                if (checkWin(boardCopy, PLAYER)) return col;
+            }
+            // 3. Prefer center column if available
+            if (validCols.includes(3)) return 3;
+            
+            return validCols[Math.floor(Math.random() * validCols.length)];
+        }
+
+        // Move Ordering for Master AI: Prioritize Center Columns (3, 2, 4, 1, 5, 0, 6)
+        const PREFERRED_COL_ORDER = [3, 2, 4, 1, 5, 0, 6];
+        function getOrderedValidLocations(b) {
+            const valid = [];
+            for (let c of PREFERRED_COL_ORDER) {
+                if (b[0][c] === EMPTY) valid.push(c);
+            }
+            return valid;
+        }
+
+        // Optimized Minimax for Master AI
+        function minimaxMaster(b, depth, alpha, beta, maximizingPlayer) {
+            const hash = computeHash(b);
+            const ttEntry = tt.get(hash);
+            if (ttEntry && ttEntry.depth >= depth) {
+                return [ttEntry.bestCol, ttEntry.value];
+            }
+
+            const validCols = getOrderedValidLocations(b);
+            const isTerminal = isTerminalNode(b);
+
+            if (depth === 0 || isTerminal) {
+                if (isTerminal) {
+                    if (checkWin(b, AI)) return [null, 10000000 + depth];
+                    else if (checkWin(b, PLAYER)) return [null, -10000000 - depth];
+                    else return [null, 0];
+                } else {
+                    return [null, scoreBoardPosition(b, AI)];
+                }
+            }
+
+            let bestCol = validCols[0];
+
+            if (maximizingPlayer) {
+                let value = -Infinity;
+                for (let col of validCols) {
+                    const r = getNextOpenRow(b, col);
+                    b[r][col] = AI;
+                    const newScore = minimaxMaster(b, depth - 1, alpha, beta, false)[1];
+                    b[r][col] = EMPTY;
+
+                    if (newScore > value) {
+                        value = newScore;
+                        bestCol = col;
+                    }
+                    alpha = Math.max(alpha, value);
+                    if (alpha >= beta) break; // Alpha-Beta Cutoff
+                }
+                tt.set(hash, { depth, value, bestCol });
+                return [bestCol, value];
+            } else {
+                let value = Infinity;
+                for (let col of validCols) {
+                    const r = getNextOpenRow(b, col);
+                    b[r][col] = PLAYER;
+                    const newScore = minimaxMaster(b, depth - 1, alpha, beta, true)[1];
+                    b[r][col] = EMPTY;
+
+                    if (newScore < value) {
+                        value = newScore;
+                        bestCol = col;
+                    }
+                    beta = Math.min(beta, value);
+                    if (alpha >= beta) break; // Alpha-Beta Cutoff
+                }
+                tt.set(hash, { depth, value, bestCol });
+                return [bestCol, value];
+            }
+        }
+
+        // Standard Minimax
+        function evaluateWindow(windowCells, piece) {
+            let score = 0;
+            const oppPiece = (piece === PLAYER) ? AI : PLAYER;
+
+            const countPiece = windowCells.filter(c => c === piece).length;
+            const countEmpty = windowCells.filter(c => c === EMPTY).length;
+            const countOpp = windowCells.filter(c => c === oppPiece).length;
+
+            if (countPiece === 4) score += 100;
+            else if (countPiece === 3 && countEmpty === 1) score += 10;
+            else if (countPiece === 2 && countEmpty === 2) score += 4;
+
+            if (countOpp === 3 && countEmpty === 1) score -= 80; // Heavy penalty for open opp line
+
+            return score;
+        }
+
+        function scoreBoardPosition(b, piece) {
+            let score = 0;
+
+            // Prefer center column
+            const centerArray = [];
+            for (let r = 0; r < ROWS; r++) centerArray.push(b[r][3]);
+            const centerCount = centerArray.filter(c => c === piece).length;
+            score += centerCount * 6;
+
+            // Score Horizontal
+            for (let r = 0; r < ROWS; r++) {
+                const rowArray = b[r];
+                for (let c = 0; c < COLS - 3; c++) {
+                    const windowCells = rowArray.slice(c, c + 4);
+                    score += evaluateWindow(windowCells, piece);
+                }
+            }
+
+            // Score Vertical
+            for (let c = 0; c < COLS; c++) {
+                const colArray = [];
+                for (let r = 0; r < ROWS; r++) colArray.push(b[r][c]);
+                for (let r = 0; r < ROWS - 3; r++) {
+                    const windowCells = colArray.slice(r, r + 4);
+                    score += evaluateWindow(windowCells, piece);
+                }
+            }
+
+            // Score Positive Diagonal
+            for (let r = 0; r < ROWS - 3; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    const windowCells = [b[r][c], b[r+1][c+1], b[r+2][c+2], b[r+3][c+3]];
+                    score += evaluateWindow(windowCells, piece);
+                }
+            }
+
+            // Score Negative Diagonal
+            for (let r = 3; r < ROWS; r++) {
+                for (let c = 0; c < COLS - 3; c++) {
+                    const windowCells = [b[r][c], b[r-1][c+1], b[r-2][c+2], b[r-3][c+3]];
+                    score += evaluateWindow(windowCells, piece);
+                }
+            }
+
+            return score;
+        }
+
+        function isTerminalNode(b) {
+            return checkWin(b, PLAYER) || checkWin(b, AI) || getValidLocations(b).length === 0;
+        }
+
+        function minimax(b, depth, alpha, beta, maximizingPlayer) {
+            const validCols = getValidLocations(b);
+            const isTerminal = isTerminalNode(b);
+
+            if (depth === 0 || isTerminal) {
+                if (isTerminal) {
+                    if (checkWin(b, AI)) return [null, 1000000];
+                    else if (checkWin(b, PLAYER)) return [null, -1000000];
+                    else return [null, 0]; // Draw
+                } else {
+                    return [null, scoreBoardPosition(b, AI)];
+                }
+            }
+
+            if (maximizingPlayer) {
+                let value = -Infinity;
+                let bestCol = validCols[Math.floor(Math.random() * validCols.length)];
+                for (let col of validCols) {
+                    const r = getNextOpenRow(b, col);
+                    const bCopy = b.map(row => [...row]);
+                    bCopy[r][col] = AI;
+                    const newScore = minimax(bCopy, depth - 1, alpha, beta, false)[1];
+                    if (newScore > value) {
+                        value = newScore;
+                        bestCol = col;
+                    }
+                    alpha = Math.max(alpha, value);
+                    if (alpha >= beta) break; // Beta cutoff
+                }
+                return [bestCol, value];
+            } else {
+                let value = Infinity;
+                let bestCol = validCols[Math.floor(Math.random() * validCols.length)];
+                for (let col of validCols) {
+                    const r = getNextOpenRow(b, col);
+                    const bCopy = b.map(row => [...row]);
+                    bCopy[r][col] = PLAYER;
+                    const newScore = minimax(bCopy, depth - 1, alpha, beta, true)[1];
+                    if (newScore < value) {
+                        value = newScore;
+                        bestCol = col;
+                    }
+                    beta = Math.min(beta, value);
+                    if (alpha >= beta) break; // Alpha cutoff
+                }
+                return [bestCol, value];
+            }
+        }
+
+        // Initialize game on window load
+        window.onload = function() {
+            initBoard();
+        };
+    </script>
+</body>
+</html>
